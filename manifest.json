@@ -1,7 +1,10 @@
-": "Moto T\u00e1xi",
-  "short_name": "Moto T\u00e1xi",
+{
+  "name": "Moto Táxi",
+  "short_name": "Moto Táxi",
+  "description": "Aplicativo de Moto Táxi para solicitar corridas rapidamente.",
   "start_url": "./index.html",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ff0000",
   "theme_color": "#ff0000",
   "icons": [
