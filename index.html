@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Comprovante de Corrida — Moto Táxi Adriano</title>
+<style>
+  :root{--bg:#0f0f0f;--card:#1a1a1a;--muted:#bbb;--accent:#19c23b;--text:#fff}
+  body{background:var(--bg);color:var(--text);font-family:Inter,Arial,Helvetica,sans-serif;margin:0;padding:18px}
+  .wrap{max-width:820px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 12px}
+  label{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
+  input,select,textarea{width:100%;padding:12px;border-radius:10px;border:none;background:#141414;color:var(--text);font-size:16px}
+  .btn{display:inline-block;padding:12px 18px;border-radius:12px;border:none;font-weight:700;cursor:pointer}
+  .btn-green{background:var(--accent);color:#fff}
+  .result{font-size:56px;color:#00ff66;text-align:center;margin:20px 0;font-weight:800}
+  .card{background:var(--card);padding:16px;border-radius:14px;margin-top:12px;color:var(--muted)}
+  .small{font-size:13px;color:var(--muted)}
+  .maps{display:flex;gap:10px;margin-top:14px}
+  .maps button{flex:1;background:#333;border-radius:10px;padding:12px;border:none;color:#fff}
+  .qrwrap{display:block;margin:14px auto;border-radius:14px;padding:12px;background:#fff;width:320px;height:320px;display:flex;align-items:center;justify-content:center}
+  .qrimg{max-width:100%;max-height:100%;display:block}
+  .photo{width:86px;height:86px;border-radius:10px;object-fit:cover;margin-right:12px}
+  .share{margin-top:14px;display:flex;gap:10px}
+  .share button{flex:1;padding:12px;border-radius:10px;border:none;background:#2d7bf5;color:#fff}
+  .hist{margin-top:18px}
+  .hist-item{background:#0e0e0e;padding:10px;border-radius:8px;margin-bottom:8px;color:var(--muted)}
+  footer{font-size:13px;color:var(--muted);margin-top:18px;text-align:center}
+  .btn-blue{background:#1e88e5;color:#fff;padding:12px;border-radius:10px;border:none}
+  @media(min-width:900px){ .wrap{padding:24px} }
+</style>
+<link rel="manifest" href="manifest.json">
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js');
+}
+</script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Comprovante de Corrida — Moto Táxi Adriano</h1>
+
+  <div class="card" style="display:flex;align-items:center">
+    <img id="driverPhoto" class="photo" src="" alt="Foto do mototaxista" />
+    <div>
+      <div style="font-weight:700" id="driverName">Adriano Alves de Oliveira Souza</div>
+      <div class="small">📞 <span id="driverPhone">(86) 98129-1332</span></div>
+      <div class="small">🏍️ <span id="driverMoto">Honda CG 125 Fan — Preta</span> • Placa: <span id="driverPlate">QRP5G89</span></div>
+      <div class="small">PIX: <b id="pixKeyText">+5586981291332</b></div>
+    </div>
+  </div>
+
+  <label>Tipo de tarifa</label>
+  <select id="tarifaTipo">
+    <option value="dia">Tarifa Dia — base R$ 3,00 • km R$ 1,50</option>
+    <option value="noite">Tarifa Noite — base R$ 3,50 • km R$ 1,80</option>
+  </select>
+
+  <label>Destino (opcional)</label>
+  <input id="destino" placeholder="Endereço ou ponto de referência">
+
+  <label>Distância (KM) — ex.: 0.8</label>
+  <input id="km" type="text" inputmode="decimal" value="0.8">
+
+  <div style="display:flex;gap:10px;margin-top:12px">
+    <button id="btnCalc" class="btn btn-green">Calcular & Gerar</button>
+    <button id="btnSave" class="btn">Salvar no Histórico</button>
+  </div>
+
+  <div id="resultado" class="result">R$ 0,00</div>
+  <div id="detalhes" class="card small">Preencha KM e clique em "Calcular & Gerar".</div>
+
+  <div class="maps">
+    <button id="btnMaps">📍 Google Maps</button>
+    <button id="btnWaze">🌍 Waze</button>
+  </div>
+
+  <h3 style="text-align:center;margin-top:18px" id="pixTitle">PIX (valor automático) — cliente pode pagar pelo QR</h3>
+
+  <div class="qrwrap" aria-hidden="false">
+    <img id="qrImg" class="qrimg" src="" alt="QR PIX (com valor)">
+  </div>
+
+  <div style="text-align:center;margin-top:8px" class="small">Chave PIX: <b id="pixKey">+5586981291332</b></div>
+
+  <div class="share">
+    <button id="btnShare" class="btn-blue">📲 Compartilhar (WhatsApp)</button>
+    <button id="btnCopy" class="btn-blue">📋 Copiar texto</button>
+  </div>
+
+  <div class="hist">
+    <h3 style="margin:8px 0">Histórico de Corridas</h3>
+    <div id="histList"></div>
+    <div style="margin-top:8px">
+      <button id="btnClear" class="btn">Limpar histórico</button>
+    </div>
+  </div>
+
+  <footer>Gerado por Moto Táxi — envie ao passageiro só por mensagem (segurança)</footer>
+</div>
+
+<script>
+/* CONFIG */
+const PIX_KEY = "+5586981291332";
+const MERCHANT_NAME = "Adriano Alves de Oliveira Souza"; // aparece no Mercado Pago, ok
+const MERCHANT_CITY = "DEMERVAL LOBAO";
+const DRIVER = { nome: MERCHANT_NAME, telephone: "(86) 98129-1332", moto: "Honda CG 125 Fan — Preta", placa: "QRP5G89" };
+const RATES = { dia: { base:3.00, km:1.50 }, noite: { base:3.50, km:1.80 } };
+const HIST_KEY = "moto_hist_v3";
+
+/* HELPERS */
+function fmtBR(v){ return Number(v).toFixed(2).replace(".",","); }
+function arredondar10cent(total){
+  // arredonda para cima ao próximo 0,10
+  const cents = Math.round(total*100);
+  const mod10 = cents % 10;
+  if(mod10 === 0) return cents/100;
+  return (cents + (10 - mod10))/100;
+}
+
+/* TLV builder + CRC16-CCITT (poly 0x1021, init 0xFFFF) */
+function tlv(id, value){
+  const s = String(value);
+  const len = String(s.length).padStart(2,"0");
+  return id + len + s;
+}
+function crc16CCITT(str){
+  let crc = 0xFFFF;
+  for(let i=0;i<str.length;i++){
+    crc ^= str.charCodeAt(i) << 8;
+    for(let j=0;j<8;j++){
+      if((crc & 0x8000) !== 0) crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+      else crc = (crc << 1) & 0xFFFF;
+    }
+  }
+  return crc & 0xFFFF;
+}
+
+/* Build PIX EMV payload correctly:
+   - Merchant Account Info (ID 26) contains sub-TLV 00 = BR.GOV.BCB.PIX and 01 = chave
+   - Additional Data Field Template (ID 62) contains sub-TLV 05 = txid (we'll use "*")
+*/
+function buildPixPayload(amount){
+  // amount should be e.g. "15.50" or empty string to not include
+  const maiSub = tlv("00","BR.GOV.BCB.PIX") + tlv("01", PIX_KEY);
+  const mai = tlv("26", maiSub);
+
+  let payload =
+    tlv("00","01") +    // Payload Format Indicator
+    mai +
+    tlv("52","0000") +  // Merchant Category Code (0000 if unspecified)
+    tlv("53","986") +   // Currency BRL
+    (amount ? tlv("54", amount) : "") + // Amount (optional)
+    tlv("58","BR") +    // Country
+    tlv("59", MERCHANT_NAME.substring(0,25)) + // Merchant name (max 25)
+    tlv("60", MERCHANT_CITY.substring(0,15)) + // Merchant city (max 15)
+    // Additional data field template, subfield 05 is txid (use '*' or unique id)
+    tlv("62", tlv("05", "*"));
+
+  // Append CRC placeholder then calculate CRC16
+  const crcInput = payload + "6304";
+  const crc = crc16CCITT(crcInput).toString(16).toUpperCase().padStart(4,"0");
+  payload = payload + "63" + "04" + crc;
+  return payload;
+}
+
+/* Calculation and UI */
+function calcularEGerar(){
+  const tipo = document.getElementById("tarifaTipo").value;
+  const kmRaw = document.getElementById("km").value || "0";
+  const km = parseFloat(String(kmRaw).replace(",","."));
+  const rates = RATES[tipo] || RATES.dia;
+  const rawTotal = (rates.base || 0) + ((isNaN(km)?0:km) * (rates.km || 0));
+  const totalRounded = arredondar10cent(rawTotal);
+
+  document.getElementById("resultado").textContent = "R$ " + fmtBR(totalRounded);
+  document.getElementById("detalhes").innerHTML = `
+    <strong>Base:</strong> R$ ${fmtBR(rates.base)}<br>
+    <strong>Distância:</strong> ${isNaN(km)?0:km} × R$ ${fmtBR(rates.km)} = R$ ${fmtBR((isNaN(km)?0:km) * rates.km)}<br>
+    <strong>Arredondamento aplicado:</strong> R$ ${fmtBR(totalRounded - rawTotal)} <br>
+    <b>Total final: R$ ${fmtBR(totalRounded)}</b>
+  `;
+
+  const amountStr = totalRounded.toFixed(2); // "15.50"
+  const payload = buildPixPayload(amountStr);
+
+  // Use qrserver to render the QR image (reliable). If offline required, I can add an encoder.
+  const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=" + encodeURIComponent(payload);
+  const img = document.getElementById("qrImg");
+  img.crossOrigin = "anonymous";
+  img.src = qrUrl;
+
+  document.getElementById("pixTitle").textContent = "PIX (valor automático) — cliente pode pagar pelo QR";
+  return { tipo, km, total: totalRounded, payload };
+}
+
+/* Maps */
+function openMaps(){
+  const dest = document.getElementById("destino").value.trim();
+  if(!dest) return alert("Digite o destino para abrir no Maps");
+  window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(dest), "_blank");
+}
+function openWaze(){
+  const dest = document.getElementById("destino").value.trim();
+  if(!dest) return alert("Digite o destino para abrir no Waze");
+  window.open("https://waze.com/ul?q=" + encodeURIComponent(dest), "_blank");
+}
+
+/* Histórico */
+function loadHistorico(){
+  const data = JSON.parse(localStorage.getItem(HIST_KEY) || "[]");
+  const box = document.getElementById("histList");
+  box.innerHTML = "";
+  if(data.length === 0){ box.innerHTML = "<div class='hist-item'>Nenhum registro ainda.</div>"; return; }
+  data.slice().reverse().forEach(item=>{
+    const div = document.createElement("div");
+    div.className = "hist-item";
+    div.innerHTML = `
+      <div style="font-weight:700">${item.data}</div>
+      <div>📍 ${item.destino || 'Sem destino'}</div>
+      <div>🛣️ ${item.km} km</div>
+      <div>💵 Total: R$ ${fmtBR(item.total)}</div>
+    `;
+    box.appendChild(div);
+  });
+}
+function salvarHistorico(){
+  const res = calcularEGerar();
+  const destino = document.getElementById("destino").value.trim();
+  const ts = new Date();
+  const item = {
+    data: ts.toLocaleString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}),
+    destino, km: res.km, total: res.total
+  };
+  const arr = JSON.parse(localStorage.getItem(HIST_KEY) || "[]");
+  arr.push(item);
+  localStorage.setItem(HIST_KEY, JSON.stringify(arr));
+  loadHistorico();
+  alert("Corrida salva no histórico.");
+}
+function limparHistorico(){
+  if(confirm("Apagar todo o histórico?")){ localStorage.removeItem(HIST_KEY); loadHistorico(); }
+}
+
+/* Compartilhar & copiar */
+function montarTextoCompartilhamento(){
+  const tipo = document.getElementById("tarifaTipo").value;
+  const destino = document.getElementById("destino").value || "(não informado)";
+  const km = parseFloat(String(document.getElementById("km").value || "0").replace(",",".") ) || 0;
+  const rates = RATES[tipo] || RATES.dia;
+  const rawTotal = (rates.base || 0) + (km * (rates.km || 0));
+  const total = arredondar10cent(rawTotal);
+
+  return `🧾 COMPROVANTE DE CORRIDA – Moto Táxi Adriano\n\n🏍️ Mototaxista: ${DRIVER.nome}\n📞 Contato: ${DRIVER.telephone}\n🆔 Moto / Placa: ${DRIVER.moto} • ${DRIVER.placa}\n\n📍 Destino: ${destino}\n📏 Distância: ${km} km\n\n📦 Detalhes:\n- Base: R$ ${fmtBR(rates.base)}\n- Distância: ${km} × R$ ${fmtBR(rates.km)} = R$ ${fmtBR(km*rates.km)}\n🔄 Arredondamento aplicado: R$ ${fmtBR(total - rawTotal)}\n💵 Total final: R$ ${fmtBR(total)}\n\n🔗 PIX (valor automático): Chave ${PIX_KEY}\n\nObrigado por utilizar o serviço.`;
+}
+function compartilharWhatsApp(){
+  const txt = montarTextoCompartilhamento();
+  window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(txt), "_blank");
+}
+function copiarTexto(){
+  const txt = montarTextoCompartilhamento();
+  navigator.clipboard.writeText(txt).then(()=> alert("Texto copiado! Cole no WhatsApp."), ()=> alert("Não foi possível copiar automaticamente."));
+}
+
+/* Inicialização */
+document.addEventListener("DOMContentLoaded", function(){
+  document.getElementById("pixKey").textContent = PIX_KEY;
+  document.getElementById("pixKeyText").textContent = PIX_KEY;
+  document.getElementById("driverPhoto").onerror = function(){ this.src = ""; };
+  document.getElementById("btnCalc").addEventListener("click", calcularEGerar);
+  document.getElementById("btnSave").addEventListener("click", salvarHistorico);
+  document.getElementById("btnMaps").addEventListener("click", openMaps);
+  document.getElementById("btnWaze").addEventListener("click", openWaze);
+  document.getElementById("btnShare").addEventListener("click", compartilharWhatsApp);
+  document.getElementById("btnCopy").addEventListener("click", copiarTexto);
+  document.getElementById("btnClear").addEventListener("click", limparHistorico);
+  loadHistorico();
+});
+</script>
+</body>
+</html>
